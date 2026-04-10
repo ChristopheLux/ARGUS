@@ -146,6 +146,7 @@ module acr 'modules/container-registry.bicep' = {
     containerRegistryName: containerRegistryName
     tags: commonTags
     privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
+    privateDnsZoneAcrId: network.outputs.privateDnsZoneAcrId
   }
 }
 

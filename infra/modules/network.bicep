@@ -66,6 +66,12 @@ resource privateDnsZoneKeyVault 'Microsoft.Network/privateDnsZones@2020-06-01' =
   tags: tags
 }
 
+resource privateDnsZoneAcr 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.azurecr.io'
+  location: 'global'
+  tags: tags
+}
+
 // VNet links for all private DNS zones
 resource vnetLinkBlob 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
   parent: privateDnsZoneBlob
@@ -117,6 +123,16 @@ resource vnetLinkKeyVault 'Microsoft.Network/privateDnsZones/virtualNetworkLinks
   }
 }
 
+resource vnetLinkAcr 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZoneAcr
+  name: 'link-acr'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnet.id }
+    registrationEnabled: false
+  }
+}
+
 output vnetId string = vnet.id
 output vnetName string = vnet.name
 output containerAppsSubnetId string = vnet.properties.subnets[0].id
@@ -126,3 +142,4 @@ output privateDnsZoneCosmosId string = privateDnsZoneCosmos.id
 output privateDnsZoneCognitiveServicesId string = privateDnsZoneCognitiveServices.id
 output privateDnsZoneOpenAIId string = privateDnsZoneOpenAI.id
 output privateDnsZoneKeyVaultId string = privateDnsZoneKeyVault.id
+output privateDnsZoneAcrId string = privateDnsZoneAcr.id

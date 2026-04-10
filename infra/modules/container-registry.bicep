@@ -3,6 +3,7 @@ param location string
 param containerRegistryName string
 param tags object
 param privateEndpointsSubnetId string = ''
+param privateDnsZoneAcrId string = ''
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: containerRegistryName
@@ -31,6 +32,22 @@ resource acrPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if
           groupIds: [
             'registry'
           ]
+        }
+      }
+    ]
+  }
+}
+
+// DNS group for ACR private endpoint (integrates with private DNS zone)
+resource acrDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = if (privateDnsZoneAcrId != '') {
+  parent: acrPrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'config'
+        properties: {
+          privateDnsZoneId: privateDnsZoneAcrId
         }
       }
     ]

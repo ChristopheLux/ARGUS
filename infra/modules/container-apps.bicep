@@ -42,7 +42,6 @@ param keyVaultUri string
 
 // VNet
 param containerAppsSubnetId string
-param privateEndpointsSubnetId string = ''
 
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: 'cae-${resourceToken}'

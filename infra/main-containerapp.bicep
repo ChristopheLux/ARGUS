@@ -46,7 +46,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
   properties: {
     adminUserEnabled: false
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
   }
   tags: commonTags
 }
@@ -208,7 +208,7 @@ resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2021-04-30' 
   properties: {
     apiProperties: {}
     customSubDomainName: documentIntelligenceName
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
   }
   tags: commonTags
 }
@@ -227,7 +227,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: containerAppEnvironment.id
     configuration: {
       ingress: {
-        external: true
+        external: false
         targetPort: 8000
         corsPolicy: {
           allowedOrigins: ['*']

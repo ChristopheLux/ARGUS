@@ -145,6 +145,7 @@ module acr 'modules/container-registry.bicep' = {
     location: location
     containerRegistryName: containerRegistryName
     tags: commonTags
+    privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
   }
 }
 
@@ -178,6 +179,7 @@ module containerApps 'modules/container-apps.bicep' = {
     azureOpenaiModelDeploymentName: azureOpenaiModelDeploymentName
     keyVaultUri: keyVault.outputs.keyVaultUri
     containerAppsSubnetId: network.outputs.containerAppsSubnetId
+    privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
   }
 }
 

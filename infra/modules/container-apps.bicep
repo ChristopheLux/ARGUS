@@ -42,6 +42,7 @@ param keyVaultUri string
 
 // VNet
 param containerAppsSubnetId string
+param privateEndpointsSubnetId string = ''
 
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: 'cae-${resourceToken}'
@@ -56,7 +57,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
     }
     vnetConfiguration: {
       infrastructureSubnetId: containerAppsSubnetId
-      internal: false
+      internal: true
     }
   }
   tags: tags
@@ -75,7 +76,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: containerAppEnvironment.id
     configuration: {
       ingress: {
-        external: true
+        external: false
         targetPort: 8000
         corsPolicy: {
           allowedOrigins: ['*']
@@ -162,7 +163,7 @@ resource frontendApp 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: containerAppEnvironment.id
     configuration: {
       ingress: {
-        external: true
+        external: false
         targetPort: 3000
       }
       registries: [

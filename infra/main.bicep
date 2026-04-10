@@ -6,7 +6,10 @@ param location string = resourceGroup().location
 param environmentName string
 param containerAppName string = 'ca-${uniqueString(resourceGroup().id)}'
 param frontendContainerAppName string = 'ca-frontend-${uniqueString(resourceGroup().id)}'
-param resourceToken string = uniqueString(subscription().id, resourceGroup().id, environmentName)
+
+@description('Subscription ID for resource deployment (defaults to current subscription)')
+param subscriptionId string = subscription().subscriptionId
+param resourceToken string = uniqueString(subscriptionId, resourceGroup().id, environmentName)
 
 param storageAccountName string = 'sa${resourceToken}'
 param cosmosDbAccountName string = 'cb${resourceToken}'

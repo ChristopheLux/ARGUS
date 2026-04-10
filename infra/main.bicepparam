@@ -4,6 +4,9 @@ using './main.bicep'
 param location = 'eastus'
 param environmentName = 'dev'
 
+// Subscription (defaults to current subscription)
+param subscriptionId = '' // Leave empty to use current subscription, or set to explicit subscription ID
+
 // Resource naming
 param containerAppName = 'ca-argus-backend'
 param frontendContainerAppName = 'ca-argus-frontend'

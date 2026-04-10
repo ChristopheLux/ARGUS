@@ -2,19 +2,22 @@
 param location string
 param resourceToken string
 param tags object
+param vnetAddressSpace string = '10.0.0.0/16'
+param containerAppsSubnetAddressPrefix string = '10.0.0.0/21'
+param privateEndpointsSubnetAddressPrefix string = '10.0.8.0/24'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
   name: 'vnet-${resourceToken}'
   location: location
   properties: {
     addressSpace: {
-      addressPrefixes: ['10.0.0.0/16']
+      addressPrefixes: [vnetAddressSpace]
     }
     subnets: [
       {
         name: 'snet-container-apps'
         properties: {
-          addressPrefix: '10.0.0.0/21'
+          addressPrefix: containerAppsSubnetAddressPrefix
           delegations: [
             {
               name: 'Microsoft.App.environments'
@@ -28,7 +31,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
       {
         name: 'snet-private-endpoints'
         properties: {
-          addressPrefix: '10.0.8.0/24'
+          addressPrefix: privateEndpointsSubnetAddressPrefix
         }
       }
     ]

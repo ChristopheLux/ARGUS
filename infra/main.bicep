@@ -19,6 +19,16 @@ param azureOpenaiModelDeploymentName string
 @description('Principal ID of the running user for role assignments')
 param azurePrincipalId string
 
+// ─── Network Configuration ───
+@description('VNet address space in CIDR notation')
+param vnetAddressSpace string = '10.0.0.0/16'
+
+@description('Container Apps subnet address prefix in CIDR notation')
+param containerAppsSubnetAddressPrefix string = '10.0.0.0/21'
+
+@description('Private Endpoints subnet address prefix in CIDR notation')
+param privateEndpointsSubnetAddressPrefix string = '10.0.8.0/24'
+
 // ─── Tags ───
 var commonTags = {
   solution: 'ARGUS-1.0'
@@ -36,6 +46,9 @@ module network 'modules/network.bicep' = {
     location: location
     resourceToken: resourceToken
     tags: commonTags
+    vnetAddressSpace: vnetAddressSpace
+    containerAppsSubnetAddressPrefix: containerAppsSubnetAddressPrefix
+    privateEndpointsSubnetAddressPrefix: privateEndpointsSubnetAddressPrefix
   }
 }
 

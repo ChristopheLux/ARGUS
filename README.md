@@ -384,7 +384,124 @@ AI: [Uses argus_create_dataset with appropriate prompt and schema]
 
 ## 🎛️ Advanced Configuration
 
-### 📊 Dataset Management
+### � Infrastructure & Deployment: Private-Only Architecture
+
+ARGUS implements a **hardened, private-only infrastructure** on the `hardening/private-only` branch where all Azure services are accessible exclusively through private endpoints. This ensures maximum security by eliminating public internet exposure.
+
+#### 🛡️ Private-Only Architecture Features
+
+**Network Isolation**
+- ✅ **Virtual Network (VNet)**: All services deployed within an isolated VNet (`10.0.0.0/16` by default)
+- ✅ **Private Endpoints**: All Azure services (Storage, Cosmos DB, OpenAI, Document Intelligence, Key Vault, ACR) are accessible ONLY via private endpoints
+- ✅ **No Public Access**: All services have `publicNetworkAccess: Disabled`
+- ✅ **Private DNS Zones**: Automatic DNS resolution for private endpoints
+- ✅ **Internal Container Apps**: Backend and frontend Container Apps run with `internal: true` (no public ingress)
+
+**Connectivity Model**
+| Service | Public Access | Private Endpoint | Private DNS |
+|---------|---|---|---|
+| Storage Account (Blob) | ❌ Disabled | ✅ Yes | ✅ privatelink.blob.azure.com |
+| Cosmos DB | ❌ Disabled | ✅ Yes | ✅ privatelink.documents.azure.com |
+| Document Intelligence | ❌ Disabled | ✅ Yes | ✅ privatelink.cognitiveservices.azure.com |
+| Azure OpenAI | ❌ Disabled | ✅ Yes | ✅ privatelink.openai.azure.com |
+| Key Vault | ❌ Disabled | ✅ Yes | ✅ privatelink.vaultcore.azure.net |
+| Container Registry | ❌ Disabled | ✅ Yes | ✅ privatelink.azurecr.io |
+| Container Apps (Apps) | ❌ Internal only | N/A | N/A |
+
+#### 📋 Infrastructure Files
+
+The infrastructure is defined using **Bicep** (Infrastructure as Code):
+
+```
+infra/
+├── main.bicep                          # Orchestrator template (modular)
+├── main.bicepparam                     # Deployment parameters & configuration
+├── main-containerapp.bicep             # Single-file Container App template
+├── main-containerapp.parameters.json   # Container App parameters
+└── modules/
+    ├── network.bicep                   # VNet, subnets, private DNS zones
+    ├── key-vault.bicep                 # Key Vault with private endpoint
+    ├── storage.bicep                   # Storage Account with private endpoint
+    ├── cosmos.bicep                    # Cosmos DB with private endpoint
+    ├── ai-services.bicep               # Azure OpenAI with private endpoint
+    ├── document-intelligence.bicep     # Document Intelligence with private endpoint
+    ├── container-registry.bicep        # ACR with private endpoint
+    ├── container-apps.bicep            # Backend & Frontend Container Apps (internal)
+    ├── identity.bicep                  # Managed Identity
+    ├── monitoring.bicep                # Application Insights & Log Analytics
+    ├── role-assignments.bicep          # RBAC role assignments
+    └── event-processing.bicep          # Event Grid subscriptions
+```
+
+#### 🔧 Deployment Parameters
+
+The infrastructure is fully parameterized for flexibility. You can customize network configuration and subscription settings:
+
+**Network Configuration Parameters** (`main.bicepparam`):
+
+```bicep
+// VNet address space (default: 10.0.0.0/16)
+param vnetAddressSpace = '10.0.0.0/16'
+
+// Container Apps subnet (supports ~2,000 IPs, default: 10.0.0.0/21)
+param containerAppsSubnetAddressPrefix = '10.0.0.0/21'
+
+// Private Endpoints subnet (supports ~256 IPs, default: 10.0.8.0/24)
+param privateEndpointsSubnetAddressPrefix = '10.0.8.0/24'
+```
+
+**Subscription Configuration**:
+
+```bicep
+// Subscription ID (defaults to current Azure context)
+param subscriptionId = subscription().subscriptionId
+```
+
+**Example: Deploy to Different Network**:
+
+```bicep
+// Override defaults for your organization's IP space
+param vnetAddressSpace = '192.168.0.0/16'
+param containerAppsSubnetAddressPrefix = '192.168.0.0/21'
+param privateEndpointsSubnetAddressPrefix = '192.168.8.0/24'
+```
+
+#### 🚀 Deploy with Private-Only Infrastructure
+
+```bash
+# 1. Switch to the hardening/private-only branch
+git checkout hardening/private-only
+
+# 2. Deploy with private-only infrastructure
+azd up
+
+# 3. Verify all services are private-only
+# - Check Azure Portal: All services should have "Public network access: Disabled"
+# - Verify private endpoints exist for all services
+# - Confirm containers apps are internal (no public FQDN)
+```
+
+#### 🔍 Verify Private-Only Setup
+
+```bash
+# Check that backend API is NOT publicly accessible
+curl $(azd env get-value BACKEND_URL)  
+# Expected: Connection timeout (service is internal-only)
+
+# Verify storage account has no public access
+az storage account show \
+  --name $(azd env get-value STORAGE_ACCOUNT_NAME) \
+  --query properties.publicNetworkAccess
+
+# Verify container registry is private
+az acr show \
+  --name $(az acr list --query '[0].name' -o tsv) \
+  --query publicNetworkAccess
+```
+
+---
+
+### �📊 Dataset Management
 
 ARGUS uses **datasets** to define how different types of documents should be processed. A dataset contains:
 - **Model Prompt**: Instructions telling the AI how to extract data from documents

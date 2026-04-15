@@ -123,9 +123,6 @@ resource monitorDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroup
       }
     ]
   }
-  dependsOn: [
-    monitorPrivateEndpoint
-  ]
 }
 
 output logAnalyticsId string = logAnalytics.id

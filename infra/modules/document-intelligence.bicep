@@ -13,6 +13,7 @@ resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' 
   }
   kind: 'FormRecognizer'
   properties: {
+    restore: true
     apiProperties: {}
     customSubDomainName: documentIntelligenceName
     publicNetworkAccess: 'Disabled'

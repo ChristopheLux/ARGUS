@@ -3,6 +3,8 @@ param location string
 param resourceToken string
 param tags object
 param azureOpenaiModelDeploymentName string
+param azureOpenaiModelName string
+param azureOpenaiModelVersion string = ''
 param privateEndpointsSubnetId string
 param privateDnsZoneOpenAIId string
 
@@ -14,6 +16,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   kind: 'OpenAI'
   properties: {
+    restore: true
     customSubDomainName: 'aoai-${resourceToken}'
     publicNetworkAccess: 'Disabled'
     disableLocalAuth: true
@@ -32,11 +35,15 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
     capacity: 800
   }
   properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-5.4'
-      version: '2026-03-05'
-    }
+    model: union(
+      {
+        format: 'OpenAI'
+        name: azureOpenaiModelName
+      },
+      azureOpenaiModelVersion != '' ? {
+        version: azureOpenaiModelVersion
+      } : {}
+    )
   }
 }
 

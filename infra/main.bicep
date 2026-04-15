@@ -17,7 +17,9 @@ param cosmosDbDatabaseName string = 'doc-extracts'
 param cosmosDbContainerName string = 'documents'
 param containerRegistryName string = 'cr${resourceToken}'
 param documentIntelligenceName string = 'di${resourceToken}'
-param azureOpenaiModelDeploymentName string
+param azureOpenaiModelDeploymentName string = 'aoai-deploy-${resourceToken}'
+param azureOpenaiModelName string = 'gpt-4o-mini'
+param azureOpenaiModelVersion string = ''
 
 @description('Principal ID of the running user for role assignments')
 param azurePrincipalId string
@@ -147,6 +149,8 @@ module aiServices 'modules/ai-services.bicep' = {
     resourceToken: resourceToken
     tags: commonTags
     azureOpenaiModelDeploymentName: azureOpenaiModelDeploymentName
+    azureOpenaiModelName: azureOpenaiModelName
+    azureOpenaiModelVersion: azureOpenaiModelVersion
     privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
     privateDnsZoneOpenAIId: network.outputs.privateDnsZoneOpenAIId
   }

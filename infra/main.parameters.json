@@ -15,7 +15,10 @@
       "value": "${AZURE_PRINCIPAL_ID}"
     },
     "azureOpenaiModelDeploymentName": {
-      "value": "${AZURE_OPENAI_MODEL_DEPLOYMENT_NAME=gpt-5.4}"
+      "value": "${AZURE_OPENAI_MODEL_DEPLOYMENT_NAME=aoai-deploy}"
+    },
+    "azureOpenaiModelName": {
+      "value": "${AZURE_OPENAI_MODEL_NAME=gpt-4o-mini}"
     }
   }
 }

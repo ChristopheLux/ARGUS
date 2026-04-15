@@ -10,13 +10,9 @@ param subscriptionId = '' // Leave empty to use current subscription, or set to 
 // Resource naming
 param containerAppName = 'ca-argus-backend'
 param frontendContainerAppName = 'ca-argus-frontend'
-param storageAccountName = 'saargusdev'
-param cosmosDbAccountName = 'cbargusdev'
 param cosmosDbDatabaseName = 'doc-extracts'
 param cosmosDbContainerName = 'documents'
-param containerRegistryName = 'crargudev'
-param documentIntelligenceName = 'diargusdev'
-param azureOpenaiModelDeploymentName = 'gpt-5.4'
+param azureOpenaiModelName = 'gpt-4o-mini'
 
 // Identity and RBAC
 param azurePrincipalId = '' // Set to your user/service principal ID

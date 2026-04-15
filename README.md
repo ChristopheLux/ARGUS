@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com)
-[![OpenAI](https://img.shields.io/badge/GPT--5.4-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
+[![OpenAI](https://img.shields.io/badge/GPT--35--Turbo-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -14,7 +14,7 @@
 
 ## 🚀 Transform Document Processing with AI Intelligence
 
-**ARGUS** revolutionizes how organizations extract, understand, and act on document data. By combining the precision of **Azure Document Intelligence** with the contextual reasoning of **GPT-5.4**, ARGUS doesn't just read documents—it *understands* them.
+**ARGUS** revolutionizes how organizations extract, understand, and act on document data. By combining the precision of **Azure Document Intelligence** with the contextual reasoning of **GPT-35-Turbo**, ARGUS doesn't just read documents—it *understands* them.
 
 ### 💡 Why ARGUS?
 
@@ -87,7 +87,7 @@ graph TB
         D --> E{🔍 OCR Provider}
         E -->|Azure| E1[Azure Document Intelligence]
         E -->|Mistral| E2[Mistral Document AI]
-        D --> F[🤖 GPT-5.4]
+        D --> F[🤖 GPT-35-Turbo]
         E1 --> G[⚙️ Hybrid Processing Pipeline]
         E2 --> G
         F --> G
@@ -133,7 +133,7 @@ graph TB
 | **📁 Document Storage** | Azure Blob Storage | Secure, scalable document repository |
 | **🗄️ Metadata Database** | Azure Cosmos DB | Results, configurations, and analytics |
 | **🔍 OCR Engine** | Azure Document Intelligence or Mistral Document AI | Structured text and layout extraction |
-| **🧠 AI Reasoning** | Azure OpenAI (GPT-5.4) | Contextual understanding and extraction |
+| **🧠 AI Reasoning** | Azure OpenAI (GPT-35-Turbo) | Contextual understanding and extraction |
 | **🏗️ Container Registry** | Azure Container Registry | Private, secure container images |
 | **🔒 Security** | Managed Identity + RBAC | Zero-credential architecture |
 | **🌐 Network** | VNet + Private Endpoints | Network isolation for all Azure services |
@@ -172,7 +172,10 @@ ARGUS implements a defense-in-depth security model:
 
 ## ⚡ Quick Start: Deploy in Minutes
 
-### 📋 Prerequisites
+### � Switch the Azure OpenAI model
+The default model is `gpt-35-turbo` for broad availability. To change it, update `azureOpenaiModelName` in `infra/main.bicep` or set `AZURE_OPENAI_MODEL_NAME` in `infra/main.parameters.json`. If you need a specific version, also set `azureOpenaiModelVersion`.
+
+### �📋 Prerequisites
 
 <details>
 <summary><b>🛠️ Required Tools (Click to expand)</b></summary>
@@ -880,7 +883,7 @@ priority: "high"
 {
   "openai_settings": {
     "endpoint": "https://your-openai.openai.azure.com/",
-    "model": "gpt-5.4",
+    "model": "gpt-35-turbo",
     "temperature": 0.1,
     "max_tokens": 4000
   },

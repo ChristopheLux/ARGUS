@@ -5,6 +5,7 @@ param tags object
 param azureOpenaiModelDeploymentName string
 param azureOpenaiModelName string
 param azureOpenaiModelVersion string = ''
+param azureOpenaiModelCapacity int = 1
 param restoreAzureOpenAI bool = false
 param privateEndpointsSubnetId string
 param privateDnsZoneOpenAIId string
@@ -35,7 +36,7 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
   name: azureOpenaiModelDeploymentName
   sku: {
     name: 'GlobalStandard'
-    capacity: 800
+    capacity: azureOpenaiModelCapacity
   }
   properties: {
     model: union(

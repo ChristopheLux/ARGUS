@@ -20,6 +20,7 @@ param documentIntelligenceName string = 'di${resourceToken}'
 param azureOpenaiModelDeploymentName string = 'aoai-deploy-${resourceToken}'
 param azureOpenaiModelName string = 'gpt-35-turbo'
 param azureOpenaiModelVersion string = ''
+param azureOpenaiModelCapacity int = 1
 param restoreDocumentIntelligence bool = false
 param restoreAzureOpenAI bool = false
 
@@ -154,6 +155,7 @@ module aiServices 'modules/ai-services.bicep' = {
     azureOpenaiModelDeploymentName: azureOpenaiModelDeploymentName
     azureOpenaiModelName: azureOpenaiModelName
     azureOpenaiModelVersion: azureOpenaiModelVersion
+    azureOpenaiModelCapacity: azureOpenaiModelCapacity
     restoreAzureOpenAI: restoreAzureOpenAI
     privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
     privateDnsZoneOpenAIId: network.outputs.privateDnsZoneOpenAIId

@@ -4,6 +4,7 @@ param documentIntelligenceName string
 param tags object
 param privateEndpointsSubnetId string
 param privateDnsZoneCognitiveServicesId string
+param restoreDocumentIntelligence bool = false
 
 resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: documentIntelligenceName
@@ -12,16 +13,18 @@ resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' 
     name: 'S0'
   }
   kind: 'FormRecognizer'
-  properties: {
-    restore: true
-    apiProperties: {}
-    customSubDomainName: documentIntelligenceName
-    publicNetworkAccess: 'Disabled'
-    disableLocalAuth: true
-    networkAcls: {
-      defaultAction: 'Deny'
+  properties: union(
+    restoreDocumentIntelligence ? { restore: true } : {},
+    {
+      apiProperties: {}
+      customSubDomainName: documentIntelligenceName
+      publicNetworkAccess: 'Disabled'
+      disableLocalAuth: true
+      networkAcls: {
+        defaultAction: 'Deny'
+      }
     }
-  }
+  )
   tags: tags
 }
 

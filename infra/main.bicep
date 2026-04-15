@@ -20,6 +20,8 @@ param documentIntelligenceName string = 'di${resourceToken}'
 param azureOpenaiModelDeploymentName string = 'aoai-deploy-${resourceToken}'
 param azureOpenaiModelName string = 'gpt-4o-mini'
 param azureOpenaiModelVersion string = ''
+param restoreDocumentIntelligence bool = false
+param restoreAzureOpenAI bool = false
 
 @description('Principal ID of the running user for role assignments')
 param azurePrincipalId string
@@ -136,6 +138,7 @@ module docIntel 'modules/document-intelligence.bicep' = {
     tags: commonTags
     privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
     privateDnsZoneCognitiveServicesId: network.outputs.privateDnsZoneCognitiveServicesId
+    restoreDocumentIntelligence: restoreDocumentIntelligence
   }
 }
 
@@ -151,6 +154,7 @@ module aiServices 'modules/ai-services.bicep' = {
     azureOpenaiModelDeploymentName: azureOpenaiModelDeploymentName
     azureOpenaiModelName: azureOpenaiModelName
     azureOpenaiModelVersion: azureOpenaiModelVersion
+    restoreAzureOpenAI: restoreAzureOpenAI
     privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
     privateDnsZoneOpenAIId: network.outputs.privateDnsZoneOpenAIId
   }

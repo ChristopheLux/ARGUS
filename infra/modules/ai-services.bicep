@@ -5,6 +5,7 @@ param tags object
 param azureOpenaiModelDeploymentName string
 param azureOpenaiModelName string
 param azureOpenaiModelVersion string = ''
+param restoreAzureOpenAI bool = false
 param privateEndpointsSubnetId string
 param privateDnsZoneOpenAIId string
 
@@ -15,15 +16,17 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     name: 'S0'
   }
   kind: 'OpenAI'
-  properties: {
-    restore: true
-    customSubDomainName: 'aoai-${resourceToken}'
-    publicNetworkAccess: 'Disabled'
-    disableLocalAuth: true
-    networkAcls: {
-      defaultAction: 'Deny'
+  properties: union(
+    restoreAzureOpenAI ? { restore: true } : {},
+    {
+      customSubDomainName: 'aoai-${resourceToken}'
+      publicNetworkAccess: 'Disabled'
+      disableLocalAuth: true
+      networkAcls: {
+        defaultAction: 'Deny'
+      }
     }
-  }
+  )
   tags: tags
 }
 

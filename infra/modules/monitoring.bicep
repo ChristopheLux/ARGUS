@@ -35,7 +35,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
 
 resource monitorPrivateLinkScope 'Microsoft.Insights/privateLinkScopes@2023-06-01-preview' = {
   name: 'mls-${resourceToken}'
-  location: location
+  location: 'global'
   properties: {
     accessModeSettings: {
       ingestionAccessMode: 'PrivateOnly'

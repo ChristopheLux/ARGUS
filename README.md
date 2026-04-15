@@ -126,6 +126,8 @@ graph TB
 
 ### 🔧 Infrastructure Components
 
+> The deployment is configured for a fully private Azure architecture. Log Analytics, Application Insights, OpenAI, Cosmos DB, Storage, Key Vault, ACR, and Document Intelligence are all connected through private endpoints and private DNS zones.
+
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **🚀 Backend API** | Azure Container Apps + FastAPI | High-performance document processing engine |
@@ -138,7 +140,7 @@ graph TB
 | **🔒 Security** | Managed Identity + RBAC | Zero-credential architecture |
 | **🌐 Network** | VNet + Private Endpoints | Network isolation for all Azure services |
 | **🔑 Secrets** | Azure Key Vault | Centralized secrets management |
-| **📊 Monitoring** | Application Insights | Performance and health monitoring |
+| **📊 Monitoring** | Application Insights (private endpoint) | Performance and health monitoring with private telemetry access |
 
 ---
 
@@ -174,6 +176,8 @@ ARGUS implements a defense-in-depth security model:
 
 ### � Switch the Azure OpenAI model
 The default model is `gpt-35-turbo` for broad availability. To change it, update `azureOpenaiModelName` in `infra/main.bicep` or set `AZURE_OPENAI_MODEL_NAME` in `infra/main.parameters.json`. If you need a specific version, also set `azureOpenaiModelVersion`.
+
+> Private deployment note: ARGUS is architected to keep OpenAI, monitoring, storage, and database traffic inside Azure using private endpoints and Private DNS zones. Monitoring telemetry flows through Application Insights with private endpoint access only.
 
 ### �📋 Prerequisites
 

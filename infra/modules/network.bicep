@@ -75,6 +75,30 @@ resource privateDnsZoneAcr 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   tags: tags
 }
 
+resource privateDnsZoneLogAnalytics 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.ods.opinsights.azure.com'
+  location: 'global'
+  tags: tags
+}
+
+resource privateDnsZoneAppInsights 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.dc.applicationinsights.azure.com'
+  location: 'global'
+  tags: tags
+}
+
+resource privateDnsZoneMonitor 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.monitor.azure.com'
+  location: 'global'
+  tags: tags
+}
+
+resource privateDnsZoneOms 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.oms.opinsights.azure.com'
+  location: 'global'
+  tags: tags
+}
+
 // VNet links for all private DNS zones
 resource vnetLinkBlob 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
   parent: privateDnsZoneBlob
@@ -136,6 +160,46 @@ resource vnetLinkAcr 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020
   }
 }
 
+resource vnetLinkLogAnalytics 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZoneLogAnalytics
+  name: 'link-loganalytics'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnet.id }
+    registrationEnabled: false
+  }
+}
+
+resource vnetLinkAppInsights 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZoneAppInsights
+  name: 'link-appinsights'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnet.id }
+    registrationEnabled: false
+  }
+}
+
+resource vnetLinkMonitor 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZoneMonitor
+  name: 'link-monitor'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnet.id }
+    registrationEnabled: false
+  }
+}
+
+resource vnetLinkOms 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZoneOms
+  name: 'link-oms'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnet.id }
+    registrationEnabled: false
+  }
+}
+
 output vnetId string = vnet.id
 output vnetName string = vnet.name
 output containerAppsSubnetId string = vnet.properties.subnets[0].id
@@ -146,3 +210,7 @@ output privateDnsZoneCognitiveServicesId string = privateDnsZoneCognitiveService
 output privateDnsZoneOpenAIId string = privateDnsZoneOpenAI.id
 output privateDnsZoneKeyVaultId string = privateDnsZoneKeyVault.id
 output privateDnsZoneAcrId string = privateDnsZoneAcr.id
+output privateDnsZoneLogAnalyticsId string = privateDnsZoneLogAnalytics.id
+output privateDnsZoneAppInsightsId string = privateDnsZoneAppInsights.id
+output privateDnsZoneMonitorId string = privateDnsZoneMonitor.id
+output privateDnsZoneOmsId string = privateDnsZoneOms.id

@@ -97,30 +97,6 @@ resource monitorDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroup
           privateDnsZoneId: privateDnsZoneMonitorId
         }
       }
-      {
-        name: 'odsConfig'
-        properties: {
-          privateDnsZoneId: privateDnsZoneLogAnalyticsId
-        }
-      }
-      {
-        name: 'omsConfig'
-        properties: {
-          privateDnsZoneId: privateDnsZoneOmsId
-        }
-      }
-      {
-        name: 'appInsightsConfig'
-        properties: {
-          privateDnsZoneId: privateDnsZoneAppInsightsId
-        }
-      }
-      {
-        name: 'blobConfig'
-        properties: {
-          privateDnsZoneId: privateDnsZoneBlobId
-        }
-      }
     ]
   }
 }

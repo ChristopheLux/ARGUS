@@ -4,10 +4,7 @@ param resourceToken string
 param tags object
 param privateEndpointsSubnetId string
 param privateDnsZoneMonitorId string
-param privateDnsZoneOmsId string
-param privateDnsZoneLogAnalyticsId string
-param privateDnsZoneAppInsightsId string
-param privateDnsZoneBlobId string
+
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {
   name: 'law-${resourceToken}'

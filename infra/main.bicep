@@ -83,10 +83,6 @@ module monitoring 'modules/monitoring.bicep' = {
     tags: commonTags
     privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
     privateDnsZoneMonitorId: network.outputs.privateDnsZoneMonitorId
-    //privateDnsZoneOmsId: network.outputs.privateDnsZoneOmsId
-    //privateDnsZoneLogAnalyticsId: network.outputs.privateDnsZoneLogAnalyticsId
-    //privateDnsZoneAppInsightsId: network.outputs.privateDnsZoneAppInsightsId
-    //privateDnsZoneBlobId: network.outputs.privateDnsZoneBlobId
   }
 }
 

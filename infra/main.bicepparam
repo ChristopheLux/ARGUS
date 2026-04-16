@@ -1,7 +1,7 @@
 using './main.bicep'
 
 // Deployment configuration
-param location = 'swedencentral' // Azure region for resource deployment
+param location = 'swedencentral' // Azure region for resource deploymentgit
 param environmentName = 'dev'
 
 // Subscription (defaults to current subscription)

@@ -45,7 +45,7 @@ resource cosmosDBRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAs
   properties: {
     roleDefinitionId: cosmosDBDataContributorRoleDefinition.id
     principalId: userManagedIdentityPrincipalId  //userManagedIdentityPrincipalId
-    scope: '/' //cosmosAccountId
+    scope: cosmosAccountId //cosmosAccountId
   }
 }
 

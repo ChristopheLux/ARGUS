@@ -229,9 +229,6 @@ module roleAssignments 'modules/role-assignments.bicep' = {
     aiServicesId: aiServices.outputs.aiServicesId
     keyVaultId: keyVault.outputs.keyVaultId
   }
-  dependsOn:  [
-    identity
-  ]
 }
 
 // ═══════════════════════════════════════════════════

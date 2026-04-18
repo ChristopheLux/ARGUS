@@ -5,6 +5,12 @@ param tags object
 param privateEndpointsSubnetId string = ''
 param privateDnsZoneAcrId string = ''
 
+@description('Optional public IP allowed to access ACR (dev only). Leave empty to disable.')
+param allowedDevIp string = '82.64.62.124'
+
+var allowDevIp = !empty(allowedDevIp)
+
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: containerRegistryName
   location: location
@@ -13,9 +19,22 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
   properties: {
     adminUserEnabled: false
-    publicNetworkAccess: 'Disabled'
+    //publicNetworkAccess: 'Disabled'
+    
+publicNetworkAccess: 'Enabled'
+    networkRuleSet: {
+      defaultAction: 'Deny'
+      ipRules: allowDevIp ? [
+        {
+          action: 'Allow'
+          value: '${allowedDevIp}/32'
+        }
+      ] : []
+    }
   }
   tags: tags
+  }
+
 }
 
 // Private Endpoint for ACR (deployed only when a private endpoints subnet is provided)

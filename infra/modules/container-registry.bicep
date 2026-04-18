@@ -24,13 +24,8 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
 publicNetworkAccess: 'Enabled'
     networkRuleSet: {
       defaultAction: 'Deny'
-      ipRules: allowDevIp ? [
-        {
-          action: 'Allow'
-          value: '${allowedDevIp}/32'
-        }
-      ] : []
     }
+    networkRuleBypassOptions: 'AzureServices' // Authorize trusted Azure Services
   }
   tags: tags
   }

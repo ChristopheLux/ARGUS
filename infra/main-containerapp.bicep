@@ -4,6 +4,7 @@ targetScope = 'resourceGroup'
 // Parameters
 param location string = resourceGroup().location
 param environmentName string
+param logAnalyticsName string
 param containerAppName string = 'ca-${uniqueString(resourceGroup().id)}'
 param resourceToken string = uniqueString(subscription().id, resourceGroup().id, environmentName)
 
@@ -52,14 +53,19 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
 }
 
 // Log Analytics Workspace
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {
+/* resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {
   name: 'law-${resourceToken}'
   location: location
   properties: {
     retentionInDays: 30
   }
   tags: commonTags
+} */
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-06-01' existing = {
+  name: logAnalyticsName
 }
+
 
 // Application Insights
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {

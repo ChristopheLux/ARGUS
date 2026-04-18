@@ -167,6 +167,7 @@ resource applicationInsightsHardened 'Microsoft.Insights/components@2020-02-02' 
 
 
 output logAnalyticsId string = logAnalytics.id
+output logAnalyticsName string = logAnalytics.name
 output logAnalyticsCustomerId string = logAnalytics.properties.customerId
 #disable-next-line outputs-should-not-contain-secrets
 output logAnalyticsSharedKey string = logAnalytics.listKeys().primarySharedKey

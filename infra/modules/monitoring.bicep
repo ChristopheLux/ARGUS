@@ -24,8 +24,8 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {
   location: location
   properties: {
     retentionInDays: 30
-    publicNetworkAccessForIngestion: initialPublicAccess 
-    publicNetworkAccessForQuery: initialPublicAccess 
+    publicNetworkAccessForIngestion: harden ? finalPublicAccess : initialPublicAccess
+    publicNetworkAccessForQuery: harden ? finalPublicAccess : initialPublicAccess
   }
   tags: tags
 }
@@ -135,19 +135,6 @@ privateDnsZoneConfigs: [
   }
 }
 
-resource logAnalyticsHardened 'Microsoft.OperationalInsights/workspaces@2021-06-01' = if (harden) {
-  name: logAnalytics.name
-  location: location
-  properties: {
-    retentionInDays: 30
-    publicNetworkAccessForIngestion: finalPublicAccess
-    publicNetworkAccessForQuery: finalPublicAccess
-  }
-  tags: tags
-  dependsOn: [
-    monitorDnsGroup
-  ]
-}
 
 resource applicationInsightsHardened 'Microsoft.Insights/components@2020-02-02' = if (harden) {
   name: applicationInsights.name

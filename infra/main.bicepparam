@@ -15,7 +15,7 @@ param cosmosDbContainerName = 'documents'
 param azureOpenaiModelName = 'gpt-4o-mini'
 
 // Identity and RBAC
-param azurePrincipalId = '' // Set to your user/service principal ID
+param azurePrincipalId = '3d16410f-67d7-4380-a31b-80d4afbc9c0c' // Set to your user/service principal ID
 
 // Network configuration (VNet and subnets)
 // Default: 10.0.0.0/16 VNet with 10.0.0.0/21 for Container Apps, 10.0.8.0/24 for Private Endpoints

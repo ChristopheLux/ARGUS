@@ -35,7 +35,7 @@ publicNetworkAccess: 'Enabled'
   tags: tags
   }
 
-}
+
 
 // Private Endpoint for ACR (deployed only when a private endpoints subnet is provided)
 resource acrPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (privateEndpointsSubnetId != '') {

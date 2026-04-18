@@ -136,22 +136,6 @@ privateDnsZoneConfigs: [
 }
 
 
-resource applicationInsightsHardened 'Microsoft.Insights/components@2020-02-02' = if (harden) {
-  name: applicationInsights.name
-  location: location
-  kind: 'web'
-  properties: {
-    Application_Type: 'web'
-    WorkspaceResourceId: logAnalytics.id
-    publicNetworkAccessForIngestion: finalPublicAccess
-    publicNetworkAccessForQuery: finalPublicAccess
-  }
-  tags: tags
-  dependsOn: [
-    monitorDnsGroup
-  ]
-}
-
 
 output logAnalyticsId string = logAnalytics.id
 output logAnalyticsName string = logAnalytics.name

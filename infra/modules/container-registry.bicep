@@ -5,10 +5,7 @@ param tags object
 param privateEndpointsSubnetId string = ''
 param privateDnsZoneAcrId string = ''
 
-@description('Optional public IP allowed to access ACR (dev only). Leave empty to disable.')
-param allowedDevIp string = '82.64.62.124'
 
-var allowDevIp = !empty(allowedDevIp)
 
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {

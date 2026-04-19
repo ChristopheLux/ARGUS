@@ -404,6 +404,24 @@ ARGUS implements a **hardened, private-only infrastructure** on the `hardening/p
 - ✅ **Private DNS Zones**: Automatic DNS resolution for private endpoints
 - ✅ **Internal Container Apps**: Backend and frontend Container Apps run with `internal: true` (no public ingress)
 
+
+## Important considerations when restricting Azure Container Registry network access
+
+If your container registry restricts access to private endpoints, selected subnets, or IP addresses, some functionality might be unavailable or require more configuration.
+
+When you disable public network access to a registry, certain trusted services, including Microsoft Defender for Cloud, can access the registry only if you enable a network setting to bypass the network rules.
+
+Once you disable the public network access, instances of certain Azure services, including Azure DevOps Services, can't access the container registry.
+
+Private endpoints aren't currently supported with agents managed by Azure DevOps. You need to use a self-hosted agent with network line of sight to the private endpoint.
+
+If the registry has an approved private endpoint and you disable public network access, you can't list repositories and tags outside the virtual network by using the Azure portal, Azure CLI, or other tools.
+
+## Reference
+
+- [Set Up Private Endpoint with Private Link for ACR – Azure Container Registry | Microsoft Learn](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-private-link)
+
+
 **Connectivity Model**
 | Service | Public Access | Private Endpoint | Private DNS |
 |---------|---|---|---|
@@ -412,7 +430,7 @@ ARGUS implements a **hardened, private-only infrastructure** on the `hardening/p
 | Document Intelligence | ❌ Disabled | ✅ Yes | ✅ privatelink.cognitiveservices.azure.com |
 | Azure OpenAI | ❌ Disabled | ✅ Yes | ✅ privatelink.openai.azure.com |
 | Key Vault | ❌ Disabled | ✅ Yes | ✅ privatelink.vaultcore.azure.net |
-| Container Registry | ❌ Disabled | ✅ Yes | ✅ privatelink.azurecr.io |
+| Container Registry | ✅ Disabled | ✅ Yes | ✅ privatelink.azurecr.io |
 | Container Apps (Apps) | ❌ Internal only | N/A | N/A |
 
 #### 📋 Infrastructure Files
@@ -476,13 +494,12 @@ param privateEndpointsSubnetAddressPrefix = '192.168.8.0/24'
 #### 🚀 Deploy with Private-Only Infrastructure
 
 ```bash
-# 1. Switch to the hardening/private-only branch
-git checkout hardening/private-only
 
-# 2. Deploy with private-only infrastructure
+
+# 1. Deploy with private-only infrastructure
 azd up
 
-# 3. Verify all services are private-only
+# 2. Verify all services are private-only
 # - Check Azure Portal: All services should have "Public network access: Disabled"
 # - Verify private endpoints exist for all services
 # - Confirm containers apps are internal (no public FQDN)

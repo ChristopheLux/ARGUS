@@ -20,7 +20,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
     
 publicNetworkAccess: 'Enabled'
     networkRuleSet: {
-      defaultAction: 'Deny'
+      defaultAction: 'Allow'  
     }
     networkRuleBypassOptions: 'AzureServices' // Authorize trusted Azure Services
   }

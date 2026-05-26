@@ -1,4 +1,5 @@
 // Container Apps Environment + Backend + Frontend Container Apps
+// Includes Private DNS Zone for the internal environment domain (required for FQDN resolution inside the VNet)
 param location string
 param resourceToken string
 param containerAppName string
@@ -42,6 +43,8 @@ param keyVaultUri string
 
 // VNet
 param containerAppsSubnetId string
+@description('Resource ID of the VNet that hosts the Container Apps subnet. Used to link the ACA private DNS zone so the internal FQDN resolves.')
+param vnetId string
 
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: 'cae-${resourceToken}'
@@ -60,6 +63,50 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
     }
   }
   tags: tags
+}
+
+// ─── Private DNS Zone for the internal Container Apps Environment domain ───
+// Without this, <app>.internal.<defaultDomain> does not resolve from inside the VNet,
+// so neither the frontend nor backend FQDNs are reachable.
+resource acaPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: containerAppEnvironment.properties.defaultDomain
+  location: 'global'
+  tags: tags
+}
+
+resource acaPrivateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: acaPrivateDnsZone
+  name: 'link-aca'
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnetId }
+    registrationEnabled: false
+  }
+}
+
+// Wildcard A record points every app in the environment at the env's static IP.
+// Covers backend, frontend, and any future apps with a single record.
+resource acaWildcardARecord 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
+  parent: acaPrivateDnsZone
+  name: '*'
+  properties: {
+    ttl: 3600
+    aRecords: [
+      { ipv4Address: containerAppEnvironment.properties.staticIp }
+    ]
+  }
+}
+
+// Some clients also need the apex record (e.g. for the env's wildcard certificate validation paths)
+resource acaApexARecord 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
+  parent: acaPrivateDnsZone
+  name: '@'
+  properties: {
+    ttl: 3600
+    aRecords: [
+      { ipv4Address: containerAppEnvironment.properties.staticIp }
+    ]
+  }
 }
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
@@ -217,3 +264,5 @@ output containerAppFqdn string = containerApp.properties.configuration.ingress.f
 output frontendAppName string = frontendApp.name
 output frontendAppFqdn string = frontendApp.properties.configuration.ingress.fqdn
 output containerAppEnvironmentId string = containerAppEnvironment.id
+output containerAppEnvironmentDefaultDomain string = containerAppEnvironment.properties.defaultDomain
+output containerAppEnvironmentStaticIp string = containerAppEnvironment.properties.staticIp

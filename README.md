@@ -126,7 +126,7 @@ graph TB
 
 ### 🔧 Infrastructure Components
 
-> The deployment is configured for a fully private Azure architecture. Log Analytics, Application Insights, OpenAI, Cosmos DB, Storage, Key Vault, ACR, and Document Intelligence are all connected through private endpoints and private DNS zones.
+> The deployment is configured for a fully private Azure architecture. Log Analytics, Application Insights, OpenAI, Cosmos DB, Storage, Key Vault, and Document Intelligence are all connected through private endpoints and private DNS zones. **Azure Container Registry is intentionally left public** (the only public component) so the Azure Developer CLI and CI pipelines can push images without a self-hosted agent or VPN. An **optional Application Gateway with WAF** can be enabled as a public entry point in front of the internal frontend.
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
@@ -136,11 +136,12 @@ graph TB
 | **🗄️ Metadata Database** | Azure Cosmos DB | Results, configurations, and analytics |
 | **🔍 OCR Engine** | Azure Document Intelligence or Mistral Document AI | Structured text and layout extraction |
 | **🧠 AI Reasoning** | Azure OpenAI (GPT-35-Turbo) | Contextual understanding and extraction |
-| **🏗️ Container Registry** | Azure Container Registry | Private, secure container images |
+| **🏗️ Container Registry** | Azure Container Registry | Container images (public by design — only public component, enables `azd` / CI image push) |
 | **🔒 Security** | Managed Identity + RBAC | Zero-credential architecture |
 | **🌐 Network** | VNet + Private Endpoints | Network isolation for all Azure services |
 | **🔑 Secrets** | Azure Key Vault | Centralized secrets management |
 | **📊 Monitoring** | Application Insights (private endpoint) | Performance and health monitoring with private telemetry access |
+| **🛡️ Application Gateway (optional)** | Application Gateway WAF_v2 + OWASP 3.2 | Optional internet-facing entry point in front of the internal frontend — enabled with a single boolean |
 
 ---
 
@@ -149,10 +150,16 @@ graph TB
 ARGUS implements a defense-in-depth security model:
 
 ### Network Isolation
-- **VNet Integration**: All Container Apps run within a dedicated Virtual Network (`10.0.0.0/16`)
-- **Private Endpoints**: Storage, Cosmos DB, OpenAI, Document Intelligence, and Key Vault are accessible only through private endpoints
-- **Private DNS Zones**: Automatic DNS resolution for private endpoints via Azure Private DNS
+- **VNet Integration**: All Container Apps run within a dedicated Virtual Network (default `10.0.0.0/16`, carved into three subnets automatically)
+- **Single network parameter**: One `vnetAddressSpace` param drives the whole layout — the three subnets are derived inside `network.bicep` via `cidrSubnet()`, so they can never overlap or drift
+  - `/21` Container Apps subnet (delegated to `Microsoft.App/environments`, ~2,000 IPs)
+  - `/24` Private Endpoints subnet
+  - `/24` Application Gateway subnet (always created, only populated when `deployAppGateway = true`)
+- **Private Endpoints**: Storage, Cosmos DB, OpenAI, Document Intelligence, Key Vault, Log Analytics, and Application Insights are accessible only through private endpoints
+- **Private DNS Zones**: Automatic DNS resolution for private endpoints via Azure Private DNS, including a wildcard zone for the Container Apps environment's `defaultDomain`
 - **No Public Access**: All backend services have `publicNetworkAccess: Disabled`
+- **ACR exception**: Azure Container Registry is intentionally public — image pulls flow outbound from the Container Apps data plane, and image pushes from `azd` / CI need a reachable endpoint
+- **Optional WAF entry point**: Set `deployAppGateway = true` to bring an internet-facing Application Gateway (WAF_v2, OWASP 3.2, Prevention mode) in front of the internal frontend. Leave it `false` for a fully-private deployment reachable only via VPN, Bastion, or Front Door with a private origin
 
 ### Identity & Authentication
 - **Managed Identity**: User-assigned managed identity for all service-to-service authentication
@@ -398,11 +405,13 @@ ARGUS implements a **hardened, private-only infrastructure** on the `hardening/p
 #### 🛡️ Private-Only Architecture Features
 
 **Network Isolation**
-- ✅ **Virtual Network (VNet)**: All services deployed within an isolated VNet (`10.0.0.0/16` by default)
-- ✅ **Private Endpoints**: All Azure services (Storage, Cosmos DB, OpenAI, Document Intelligence, Key Vault, ACR) are accessible ONLY via private endpoints
-- ✅ **No Public Access**: All services have `publicNetworkAccess: Disabled`
-- ✅ **Private DNS Zones**: Automatic DNS resolution for private endpoints
+- ✅ **Virtual Network (VNet)**: All services deployed within an isolated VNet (`10.0.0.0/16` by default) with three derived subnets — Container Apps `/21`, Private Endpoints `/24`, Application Gateway `/24`
+- ✅ **Private Endpoints**: Storage, Cosmos DB, OpenAI, Document Intelligence, Key Vault, Log Analytics, and Application Insights are accessible ONLY via private endpoints
+- ✅ **No Public Access**: All backing PaaS services have `publicNetworkAccess: Disabled`
+- ⚠️ **ACR is public by design**: Container Registry stays public so `azd` and CI runners can push images without a self-hosted agent or VPN. Image pulls flow outbound from the Container Apps data plane
+- ✅ **Private DNS Zones**: Automatic DNS resolution for private endpoints, plus a wildcard zone for the Container Apps environment's `defaultDomain`
 - ✅ **Internal Container Apps**: Backend and frontend Container Apps run with `internal: true` (no public ingress)
+- 🛡️ **Optional WAF entry point**: `deployAppGateway = true` adds an Application Gateway WAF_v2 (OWASP 3.2, Prevention mode) in its own subnet, terminating public HTTP and forwarding HTTPS to the frontend's internal FQDN via the private DNS zone
 
 
 ## Important considerations when restricting Azure Container Registry network access
@@ -430,8 +439,10 @@ If the registry has an approved private endpoint and you disable public network 
 | Document Intelligence | ❌ Disabled | ✅ Yes | ✅ privatelink.cognitiveservices.azure.com |
 | Azure OpenAI | ❌ Disabled | ✅ Yes | ✅ privatelink.openai.azure.com |
 | Key Vault | ❌ Disabled | ✅ Yes | ✅ privatelink.vaultcore.azure.net |
-| Container Registry | ✅ Disabled | ✅ Yes | ✅ privatelink.azurecr.io |
-| Container Apps (Apps) | ❌ Internal only | N/A | N/A |
+| Log Analytics + App Insights | ❌ Disabled (via AMPLS) | ✅ Yes | ✅ privatelink.monitor / .ods / .oms / .agentsvc |
+| Container Registry | ✅ **Enabled (by design)** | ❌ No | N/A |
+| Container Apps (Apps) | ❌ Internal only | N/A | ✅ private zone for env `defaultDomain` |
+| Application Gateway (optional) | ✅ Enabled (when `deployAppGateway = true`) | N/A | N/A |
 
 #### 📋 Infrastructure Files
 
@@ -444,51 +455,81 @@ infra/
 ├── main-containerapp.bicep             # Single-file Container App template
 ├── main-containerapp.parameters.json   # Container App parameters
 └── modules/
-    ├── network.bicep                   # VNet, subnets, private DNS zones
+    ├── network.bicep                   # VNet (single vnetAddressSpace param), 3 derived subnets, private DNS zones
     ├── key-vault.bicep                 # Key Vault with private endpoint
     ├── storage.bicep                   # Storage Account with private endpoint
     ├── cosmos.bicep                    # Cosmos DB with private endpoint
     ├── ai-services.bicep               # Azure OpenAI with private endpoint
     ├── document-intelligence.bicep     # Document Intelligence with private endpoint
-    ├── container-registry.bicep        # ACR with private endpoint
-    ├── container-apps.bicep            # Backend & Frontend Container Apps (internal)
+    ├── container-registry.bicep        # ACR (public by design — only public component)
+    ├── container-apps.bicep            # Backend & Frontend Container Apps (internal) + ACA Private DNS Zone
     ├── identity.bicep                  # Managed Identity
-    ├── monitoring.bicep                # Application Insights & Log Analytics
+    ├── monitoring.bicep                # Application Insights & Log Analytics (AMPLS-private)
     ├── role-assignments.bicep          # RBAC role assignments
-    └── event-processing.bicep          # Event Grid subscriptions
+    ├── event-processing.bicep          # Event Grid subscriptions
+    └── app-gateway.bicep               # Optional: App Gateway + WAF_v2 (deployed when deployAppGateway = true)
 ```
 
 #### 🔧 Deployment Parameters
 
-The infrastructure is fully parameterized for flexibility. You can customize network configuration and subscription settings:
+The infrastructure is parameterized but kept deliberately small — there is exactly one knob for the network and one knob for the optional WAF.
 
-**Network Configuration Parameters** (`main.bicepparam`):
+**Network configuration — one parameter** (`main.bicepparam`):
 
 ```bicep
 // VNet address space (default: 10.0.0.0/16)
+// The three subnets are derived automatically inside network.bicep via cidrSubnet():
+//   .0.0/21   → Container Apps environment (delegated, ~2,000 IPs)
+//   .8.0/24   → Private endpoints for PaaS services
+//   .9.0/24   → Application Gateway (only populated when deployAppGateway = true)
 param vnetAddressSpace = '10.0.0.0/16'
-
-// Container Apps subnet (supports ~2,000 IPs, default: 10.0.0.0/21)
-param containerAppsSubnetAddressPrefix = '10.0.0.0/21'
-
-// Private Endpoints subnet (supports ~256 IPs, default: 10.0.8.0/24)
-param privateEndpointsSubnetAddressPrefix = '10.0.8.0/24'
 ```
 
-**Subscription Configuration**:
+> **Why a single parameter?** Earlier versions exposed three separate prefixes (`vnetAddressSpace`, `containerAppsSubnetAddressPrefix`, `privateEndpointsSubnetAddressPrefix`) that had to stay in sync manually. Now you set the parent CIDR once and the subnets are carved out automatically — no chance of overlap or drift.
+
+**Optional Application Gateway + WAF** (`main.bicepparam`):
 
 ```bicep
-// Subscription ID (defaults to current Azure context)
-param subscriptionId = subscription().subscriptionId
+// Set to true to deploy an internet-facing Application Gateway (WAF_v2, OWASP 3.2,
+// Prevention mode) in front of the internal frontend container app.
+// Leave false for a fully-private deployment reachable only via VPN/Bastion/Front Door.
+param deployAppGateway = false
 ```
 
-**Example: Deploy to Different Network**:
+When `deployAppGateway = true`, the template provisions:
+- **WAF Policy**: OWASP 3.2 managed rules, Prevention mode, request-body inspection on
+- **Public IP**: Standard SKU, static allocation, with a DNS label `agw-<resourceToken>`
+- **Application Gateway**: `WAF_v2` SKU, autoscale 1–3 instances, in the dedicated `snet-app-gateway` subnet
+- **Backend pool**: Points at the frontend container app's internal FQDN; HTTPS:443 backend settings use `pickHostNameFromBackendAddress: true` so SNI and the `Host` header match the ACA certificate
+- **Outputs**: `APP_GATEWAY_PUBLIC_IP`, `APP_GATEWAY_FQDN`, `APP_GATEWAY_URL` (empty strings when the toggle is off)
+
+**Subscription configuration**:
 
 ```bicep
-// Override defaults for your organization's IP space
+// Subscription ID (defaults to current Azure context — only override for cross-subscription deployments)
+// param subscriptionId = subscription().subscriptionId
+```
+
+**Example: Deploy to a different IP space**:
+
+```bicep
+// Override defaults for your organization's address plan.
+// Subnets are still derived automatically — no other params to change.
 param vnetAddressSpace = '192.168.0.0/16'
-param containerAppsSubnetAddressPrefix = '192.168.0.0/21'
-param privateEndpointsSubnetAddressPrefix = '192.168.8.0/24'
+```
+
+**Example: Public WAF in front of the frontend**:
+
+```bicep
+param vnetAddressSpace = '10.0.0.0/16'
+param deployAppGateway   = true
+```
+
+After `azd up`, retrieve the public URL:
+
+```bash
+azd env get-value APP_GATEWAY_URL
+# → http://agw-<token>.<region>.cloudapp.azure.com
 ```
 
 #### 🚀 Deploy with Private-Only Infrastructure
@@ -517,10 +558,16 @@ az storage account show \
   --name $(azd env get-value STORAGE_ACCOUNT_NAME) \
   --query properties.publicNetworkAccess
 
-# Verify container registry is private
+# ACR is intentionally public (the only public component) so azd / CI can push images.
+# Confirm public access is Enabled — this is the expected state, not a misconfiguration.
 az acr show \
   --name $(az acr list --query '[0].name' -o tsv) \
   --query publicNetworkAccess
+# Expected: "Enabled"
+
+# (Optional) When deployAppGateway = true, hit the public WAF endpoint:
+azd env get-value APP_GATEWAY_URL
+# → http://agw-<token>.<region>.cloudapp.azure.com
 ```
 
 ---
@@ -669,18 +716,19 @@ ARGUS/
 │   ├── ⚙️ main-containerapp.parameters.json # Container App parameters
 │   ├── 📋 abbreviations.json            # Azure resource naming abbreviations
 │   └── 📂 modules/                      # Modular Bicep components
-│       ├── ⚙️ network.bicep             # VNet, subnets, private DNS zones
+│       ├── ⚙️ network.bicep             # VNet (single vnetAddressSpace), 3 derived subnets, private DNS zones
 │       ├── ⚙️ identity.bicep            # User-assigned managed identity
 │       ├── ⚙️ storage.bicep             # Storage account + private endpoint
 │       ├── ⚙️ cosmos.bicep              # Cosmos DB + private endpoint
 │       ├── ⚙️ ai-services.bicep         # Azure OpenAI + model deployment + PE
 │       ├── ⚙️ document-intelligence.bicep # Doc Intelligence + private endpoint
 │       ├── ⚙️ key-vault.bicep           # Key Vault + private endpoint
-│       ├── ⚙️ container-registry.bicep  # ACR for container images
-│       ├── ⚙️ container-apps.bicep      # CAE + backend/frontend container apps
+│       ├── ⚙️ container-registry.bicep  # ACR (public by design — only public component)
+│       ├── ⚙️ container-apps.bicep      # CAE + backend/frontend container apps + ACA private DNS zone
 │       ├── ⚙️ role-assignments.bicep    # RBAC role assignments
-│       ├── ⚙️ monitoring.bicep          # Application Insights + Log Analytics
-│       └── ⚙️ event-processing.bicep    # Event Grid subscriptions
+│       ├── ⚙️ monitoring.bicep          # Application Insights + Log Analytics (AMPLS-private)
+│       ├── ⚙️ event-processing.bicep    # Event Grid subscriptions
+│       └── ⚙️ app-gateway.bicep         # Optional App Gateway + WAF_v2 (deployAppGateway = true)
 │
 ├── 📂 src/                              # 🚀 Core Application Source Code
 │   ├── 📂 containerapp/                 # FastAPI Backend Service

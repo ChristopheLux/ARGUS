@@ -1,4 +1,5 @@
 // ARGUS Infrastructure — Modularized with VNet, Private Endpoints, Key Vault, RBAC
+// Fully private deployment. ACR is the only intentionally public component (for image push from CI/azd).
 targetScope = 'resourceGroup'
 
 // ─── Parameters ───
@@ -28,14 +29,14 @@ param restoreAzureOpenAI bool = false
 param azurePrincipalId string
 
 // ─── Network Configuration ───
-@description('VNet address space in CIDR notation')
+// Single source of truth: only the VNet address space is configurable here.
+// Subnet prefixes are derived inside the network module using cidrSubnet().
+@description('VNet address space in CIDR notation. /16 recommended; subnets are carved out automatically.')
 param vnetAddressSpace string = '10.0.0.0/16'
 
-@description('Container Apps subnet address prefix in CIDR notation')
-param containerAppsSubnetAddressPrefix string = '10.0.0.0/21'
-
-@description('Private Endpoints subnet address prefix in CIDR notation')
-param privateEndpointsSubnetAddressPrefix string = '10.0.8.0/24'
+// ─── App Gateway / WAF (optional) ───
+@description('Set to true to deploy an internet-facing Application Gateway (WAF_v2) in front of the frontend container app. Leave false for a fully-private deployment reachable only via VPN/Bastion.')
+param deployAppGateway bool = false
 
 // ─── Tags ───
 var commonTags = {
@@ -55,8 +56,6 @@ module network 'modules/network.bicep' = {
     resourceToken: resourceToken
     tags: commonTags
     vnetAddressSpace: vnetAddressSpace
-    containerAppsSubnetAddressPrefix: containerAppsSubnetAddressPrefix
-    privateEndpointsSubnetAddressPrefix: privateEndpointsSubnetAddressPrefix
   }
 }
 
@@ -73,7 +72,7 @@ module identity 'modules/identity.bicep' = {
 }
 
 // ═══════════════════════════════════════════════════
-// Module: Monitoring (Log Analytics + App Insights)
+// Module: Monitoring (Log Analytics + App Insights, AMPLS-private)
 // ═══════════════════════════════════════════════════
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
@@ -89,7 +88,7 @@ module monitoring 'modules/monitoring.bicep' = {
 }
 
 // ═══════════════════════════════════════════════════
-// Module: Key Vault (with private endpoint, RBAC)
+// Module: Key Vault (private endpoint, RBAC)
 // ═══════════════════════════════════════════════════
 module keyVault 'modules/key-vault.bicep' = {
   name: 'keyVault'
@@ -167,7 +166,7 @@ module aiServices 'modules/ai-services.bicep' = {
 }
 
 // ═══════════════════════════════════════════════════
-// Module: Container Registry (Basic, managed identity pull)
+// Module: Container Registry (PUBLIC by design — only public component)
 // ═══════════════════════════════════════════════════
 module acr 'modules/container-registry.bicep' = {
   name: 'acr'
@@ -175,13 +174,11 @@ module acr 'modules/container-registry.bicep' = {
     location: location
     containerRegistryName: containerRegistryName
     tags: commonTags
-    privateEndpointsSubnetId: network.outputs.privateEndpointsSubnetId
-    privateDnsZoneAcrId: network.outputs.privateDnsZoneAcrId
   }
 }
 
 // ═══════════════════════════════════════════════════
-// Module: Container Apps (Backend + Frontend)
+// Module: Container Apps (Backend + Frontend, internal env, ACA private DNS zone)
 // ═══════════════════════════════════════════════════
 module containerApps 'modules/container-apps.bicep' = {
   name: 'containerApps'
@@ -210,6 +207,7 @@ module containerApps 'modules/container-apps.bicep' = {
     azureOpenaiModelDeploymentName: azureOpenaiModelDeploymentName
     keyVaultUri: keyVault.outputs.keyVaultUri
     containerAppsSubnetId: network.outputs.containerAppsSubnetId
+    vnetId: network.outputs.vnetId
   }
 }
 
@@ -228,6 +226,22 @@ module roleAssignments 'modules/role-assignments.bicep' = {
     documentIntelligenceId: docIntel.outputs.documentIntelligenceId
     aiServicesId: aiServices.outputs.aiServicesId
     keyVaultId: keyVault.outputs.keyVaultId
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Module: Application Gateway + WAF (optional public entry point)
+// Deployed only when deployAppGateway = true. Brings the internal frontend
+// container app to the internet through WAF_v2 (OWASP 3.2, Prevention mode).
+// ═══════════════════════════════════════════════════
+module appGateway 'modules/app-gateway.bicep' = if (deployAppGateway) {
+  name: 'appGateway'
+  params: {
+    location: location
+    resourceToken: resourceToken
+    tags: commonTags
+    appGatewaySubnetId: network.outputs.appGatewaySubnetId
+    frontendFqdn: containerApps.outputs.frontendAppFqdn
   }
 }
 
@@ -278,3 +292,12 @@ output logicAppName string = eventProcessing.outputs.logicAppName
 output frontendContainerAppName string = containerApps.outputs.frontendAppName
 output frontendContainerAppFqdn string = containerApps.outputs.frontendAppFqdn
 output FRONTEND_URL string = 'https://${containerApps.outputs.frontendAppFqdn}'
+
+// New: surface the ACA env's internal domain and static IP for diagnostics
+output containerAppEnvironmentDefaultDomain string = containerApps.outputs.containerAppEnvironmentDefaultDomain
+output containerAppEnvironmentStaticIp string = containerApps.outputs.containerAppEnvironmentStaticIp
+
+// App Gateway outputs (empty strings when deployAppGateway = false)
+output APP_GATEWAY_PUBLIC_IP string = deployAppGateway ? appGateway.outputs.appGatewayPublicIp : ''
+output APP_GATEWAY_FQDN string = deployAppGateway ? appGateway.outputs.appGatewayFqdn : ''
+output APP_GATEWAY_URL string = deployAppGateway ? 'http://${appGateway.outputs.appGatewayFqdn}' : ''

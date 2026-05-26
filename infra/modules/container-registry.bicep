@@ -1,12 +1,9 @@
-// Container Registry - Basic SKU, managed identity pull, private-only by default
+// Container Registry - Premium SKU, managed identity pull, PUBLIC access (per design)
+// ACR is intentionally the only component left publicly accessible so that azd / CI pipelines
+// can push images without VNet integration. All other services are private.
 param location string
 param containerRegistryName string
 param tags object
-param privateEndpointsSubnetId string = ''
-param privateDnsZoneAcrId string = ''
-
-
-
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: containerRegistryName
@@ -16,53 +13,13 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   }
   properties: {
     adminUserEnabled: false
-    //publicNetworkAccess: 'Disabled'
-    
-publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Enabled'
     networkRuleSet: {
-      defaultAction: 'Allow'  
+      defaultAction: 'Allow'
     }
-    networkRuleBypassOptions: 'AzureServices' // Authorize trusted Azure Services
+    networkRuleBypassOptions: 'AzureServices'
   }
   tags: tags
-  }
-
-
-
-// Private Endpoint for ACR (deployed only when a private endpoints subnet is provided)
-resource acrPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (privateEndpointsSubnetId != '') {
-  name: 'pe-acr-${uniqueString(containerRegistry.id)}'
-  location: location
-  properties: {
-    subnet: { id: privateEndpointsSubnetId }
-    privateLinkServiceConnections: [
-      {
-        name: 'acr-connection'
-        properties: {
-          privateLinkServiceId: containerRegistry.id
-          groupIds: [
-            'registry'
-          ]
-        }
-      }
-    ]
-  }
-}
-
-// DNS group for ACR private endpoint (integrates with private DNS zone)
-resource acrDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = if (privateDnsZoneAcrId != '') {
-  parent: acrPrivateEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'config'
-        properties: {
-          privateDnsZoneId: privateDnsZoneAcrId
-        }
-      }
-    ]
-  }
 }
 
 output registryId string = containerRegistry.id

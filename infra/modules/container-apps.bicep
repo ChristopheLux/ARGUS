@@ -2,10 +2,22 @@
 // Includes Private DNS Zone for the internal environment domain (required for FQDN resolution inside the VNet)
 param location string
 param resourceToken string
-param containerAppName string
+param backendContainerAppName string
 param frontendContainerAppName string
 param tags object
 param serviceResourceTags object
+
+// Image preservation: every `azd provision` re-applies this template, which would
+// overwrite whatever image `azd deploy` last pushed with the placeholder below.
+// When these flags are true, we look up the current image on the live container
+// app and reuse it. Set to false on the very first provision (resource doesn't
+// exist yet), and flip to true in main.bicepparam after the first successful deploy.
+@description('Set to true after the first azd deploy of the backend so subsequent provisions preserve the deployed image instead of reverting to the placeholder.')
+param backendAppExists bool = false
+@description('Set to true after the first azd deploy of the frontend so subsequent provisions preserve the deployed image instead of reverting to the placeholder.')
+param frontendAppExists bool = false
+
+var placeholderImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 // Monitoring
 param logAnalyticsCustomerId string
@@ -46,6 +58,10 @@ param containerAppsSubnetId string
 @description('Resource ID of the VNet that hosts the Container Apps subnet. Used to link the ACA private DNS zone so the internal FQDN resolves.')
 param vnetId string
 
+// Workload Profiles SKU is required so the infrastructure subnet can be /27.
+// A Consumption-only environment requires /23 minimum, which does not fit a /24 VNet.
+// We declare only the built-in 'Consumption' profile — apps still run serverless,
+// just on the Workload Profiles plane. Add dedicated profiles here later if needed.
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: 'cae-${resourceToken}'
   location: location
@@ -61,6 +77,12 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
       infrastructureSubnetId: containerAppsSubnetId
       internal: true
     }
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
   }
   tags: tags
 }
@@ -68,49 +90,34 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
 // ─── Private DNS Zone for the internal Container Apps Environment domain ───
 // Without this, <app>.internal.<defaultDomain> does not resolve from inside the VNet,
 // so neither the frontend nor backend FQDNs are reachable.
-resource acaPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: containerAppEnvironment.properties.defaultDomain
-  location: 'global'
-  tags: tags
-}
-
-resource acaPrivateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: acaPrivateDnsZone
-  name: 'link-aca'
-  location: 'global'
-  properties: {
-    virtualNetwork: { id: vnetId }
-    registrationEnabled: false
+//
+// The zone, vnet link, and A records live in a sub-module because Bicep can't use
+// runtime values (containerAppEnvironment.properties.defaultDomain / staticIp) as
+// resource names in the same file (BCP120). Passing them as module parameters works
+// — the inner deployment materializes after the parent resource exists.
+module acaDns './aca-dns.bicep' = {
+  name: 'acaDns'
+  params: {
+    defaultDomain: containerAppEnvironment.properties.defaultDomain
+    staticIp: containerAppEnvironment.properties.staticIp
+    vnetId: vnetId
+    tags: tags
   }
 }
 
-// Wildcard A record points every app in the environment at the env's static IP.
-// Covers backend, frontend, and any future apps with a single record.
-resource acaWildcardARecord 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
-  parent: acaPrivateDnsZone
-  name: '*'
-  properties: {
-    ttl: 3600
-    aRecords: [
-      { ipv4Address: containerAppEnvironment.properties.staticIp }
-    ]
-  }
+// ─── Existing-image lookups (preserve `azd deploy` artifacts across `azd provision`) ───
+resource existingBackendApp 'Microsoft.App/containerApps@2024-03-01' existing = if (backendAppExists) {
+  name: backendContainerAppName
+}
+resource existingFrontendApp 'Microsoft.App/containerApps@2024-03-01' existing = if (frontendAppExists) {
+  name: frontendContainerAppName
 }
 
-// Some clients also need the apex record (e.g. for the env's wildcard certificate validation paths)
-resource acaApexARecord 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
-  parent: acaPrivateDnsZone
-  name: '@'
-  properties: {
-    ttl: 3600
-    aRecords: [
-      { ipv4Address: containerAppEnvironment.properties.staticIp }
-    ]
-  }
-}
+var backendImage = backendAppExists ? existingBackendApp.properties.template.containers[0].image : placeholderImage
+var frontendImage = frontendAppExists ? existingFrontendApp.properties.template.containers[0].image : placeholderImage
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: containerAppName
+  name: backendContainerAppName
   location: location
   identity: {
     type: 'UserAssigned'
@@ -120,6 +127,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
   properties: {
     environmentId: containerAppEnvironment.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: false
@@ -141,8 +149,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     template: {
       containers: [
         {
-          name: containerAppName
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          name: backendContainerAppName
+          image: backendImage
           resources: {
             cpu: json('1.0')
             memory: '2Gi'
@@ -166,7 +174,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storageAccountName }
             { name: 'AZURE_KEY_VAULT_URI', value: keyVaultUri }
             // OpenTelemetry + GenAI tracing
-            { name: 'OTEL_SERVICE_NAME', value: containerAppName }
+            { name: 'OTEL_SERVICE_NAME', value: backendContainerAppName }
             { name: 'OTEL_TRACES_EXPORTER', value: 'otlp' }
             { name: 'OTEL_METRICS_EXPORTER', value: 'otlp' }
             { name: 'OTEL_LOGS_EXPORTER', value: 'otlp' }
@@ -209,7 +217,11 @@ resource frontendApp 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: containerAppEnvironment.id
     configuration: {
       ingress: {
-        external: false
+        // external:true on an internal env = "Limited to VNet" (not internet).
+        // Required so App Gateway (which lives in the VNet but outside the ACA env)
+        // can reach this app. With external:false the ingress is "Limited to Container
+        // Apps Environment" and rejects everything from outside the env → 404.
+        external: true
         targetPort: 3000
       }
       registries: [
@@ -223,7 +235,7 @@ resource frontendApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: frontendContainerAppName
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          image: frontendImage
           resources: {
             cpu: json('1.0')
             memory: '2Gi'
@@ -259,7 +271,7 @@ resource frontendApp 'Microsoft.App/containerApps@2024-03-01' = {
   tags: union(tags, { 'azd-service-name': 'frontend' })
 }
 
-output containerAppName string = containerApp.name
+output backendContainerAppName string = containerApp.name
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output frontendAppName string = frontendApp.name
 output frontendAppFqdn string = frontendApp.properties.configuration.ingress.fqdn

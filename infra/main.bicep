@@ -5,7 +5,7 @@ targetScope = 'resourceGroup'
 // ─── Parameters ───
 param location string = resourceGroup().location
 param environmentName string
-param containerAppName string = 'ca-${uniqueString(resourceGroup().id)}'
+param backendContainerAppName string = 'ca-backend-${uniqueString(resourceGroup().id)}'
 param frontendContainerAppName string = 'ca-frontend-${uniqueString(resourceGroup().id)}'
 
 @description('Subscription ID for resource deployment (defaults to current subscription)')
@@ -19,7 +19,7 @@ param cosmosDbContainerName string = 'documents'
 param containerRegistryName string = 'cr${resourceToken}'
 param documentIntelligenceName string = 'di${resourceToken}'
 param azureOpenaiModelDeploymentName string = 'aoai-deploy-${resourceToken}'
-param azureOpenaiModelName string = 'gpt-35-turbo'
+param azureOpenaiModelName string = 'gpt-4.1'
 param azureOpenaiModelVersion string = ''
 param azureOpenaiModelCapacity int = 1
 param restoreDocumentIntelligence bool = false
@@ -31,12 +31,22 @@ param azurePrincipalId string
 // ─── Network Configuration ───
 // Single source of truth: only the VNet address space is configurable here.
 // Subnet prefixes are derived inside the network module using cidrSubnet().
-@description('VNet address space in CIDR notation. /16 recommended; subnets are carved out automatically.')
-param vnetAddressSpace string = '10.0.0.0/16'
+@description('VNet address space in CIDR notation. /24 is the default; subnets are carved out automatically. Increase to /23 or larger only if you need more than ~30 IPs per zone.')
+param vnetAddressSpace string = '10.0.0.0/24'
 
 // ─── App Gateway / WAF (optional) ───
 @description('Set to true to deploy an internet-facing Application Gateway (WAF_v2) in front of the frontend container app. Leave false for a fully-private deployment reachable only via VPN/Bastion.')
 param deployAppGateway bool = false
+
+// ─── Container App image preservation ───
+// On first deploy these stay false (the container apps don't exist yet, so the
+// placeholder image is used). After the first successful `azd deploy`, flip them
+// to true in main.bicepparam so subsequent `azd provision` runs read the live
+// image off the existing container app instead of clobbering it with the placeholder.
+@description('Set to true after the first azd deploy of the backend service.')
+param backendAppExists bool = false
+@description('Set to true after the first azd deploy of the frontend service.')
+param frontendAppExists bool = false
 
 // ─── Tags ───
 var commonTags = {
@@ -185,7 +195,7 @@ module containerApps 'modules/container-apps.bicep' = {
   params: {
     location: location
     resourceToken: resourceToken
-    containerAppName: containerAppName
+    backendContainerAppName: backendContainerAppName
     frontendContainerAppName: frontendContainerAppName
     tags: commonTags
     serviceResourceTags: serviceResourceTags
@@ -208,6 +218,8 @@ module containerApps 'modules/container-apps.bicep' = {
     keyVaultUri: keyVault.outputs.keyVaultUri
     containerAppsSubnetId: network.outputs.containerAppsSubnetId
     vnetId: network.outputs.vnetId
+    backendAppExists: backendAppExists
+    frontendAppExists: frontendAppExists
   }
 }
 
@@ -265,7 +277,7 @@ module eventProcessing 'modules/event-processing.bicep' = {
 // ═══════════════════════════════════════════════════
 output resourceGroupName string = resourceGroup().name
 output RESOURCE_GROUP_ID string = resourceGroup().id
-output containerAppName string = containerApps.outputs.containerAppName
+output containerAppName string = containerApps.outputs.backendContainerAppName
 output containerAppFqdn string = containerApps.outputs.containerAppFqdn
 output BACKEND_URL string = 'https://${containerApps.outputs.containerAppFqdn}'
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = acr.outputs.registryLoginServer
@@ -297,7 +309,9 @@ output FRONTEND_URL string = 'https://${containerApps.outputs.frontendAppFqdn}'
 output containerAppEnvironmentDefaultDomain string = containerApps.outputs.containerAppEnvironmentDefaultDomain
 output containerAppEnvironmentStaticIp string = containerApps.outputs.containerAppEnvironmentStaticIp
 
-// App Gateway outputs (empty strings when deployAppGateway = false)
-output APP_GATEWAY_PUBLIC_IP string = deployAppGateway ? appGateway.outputs.appGatewayPublicIp : ''
-output APP_GATEWAY_FQDN string = deployAppGateway ? appGateway.outputs.appGatewayFqdn : ''
-output APP_GATEWAY_URL string = deployAppGateway ? 'http://${appGateway.outputs.appGatewayFqdn}' : ''
+// App Gateway outputs (empty strings when deployAppGateway = false).
+// Conditional modules have type `module | null`, so use the safe-dereference
+// operator (`.?`) to silence BCP318 — `appGateway` is null when the toggle is off.
+output APP_GATEWAY_PUBLIC_IP string = appGateway.?outputs.appGatewayPublicIp ?? ''
+output APP_GATEWAY_FQDN string = appGateway.?outputs.appGatewayFqdn ?? ''
+output APP_GATEWAY_URL string = deployAppGateway ? 'http://${appGateway!.outputs.appGatewayFqdn}' : ''

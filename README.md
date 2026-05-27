@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com)
-[![OpenAI](https://img.shields.io/badge/GPT--35--Turbo-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
+[![OpenAI](https://img.shields.io/badge/GPT--4.1-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -14,7 +14,7 @@
 
 ## 🚀 Transform Document Processing with AI Intelligence
 
-**ARGUS** revolutionizes how organizations extract, understand, and act on document data. By combining the precision of **Azure Document Intelligence** with the contextual reasoning of **GPT-35-Turbo**, ARGUS doesn't just read documents—it *understands* them.
+**ARGUS** revolutionizes how organizations extract, understand, and act on document data. By combining the precision of **Azure Document Intelligence** with the contextual reasoning of **GPT-4.1**, ARGUS doesn't just read documents—it *understands* them.
 
 ### 💡 Why ARGUS?
 
@@ -87,7 +87,7 @@ graph TB
         D --> E{🔍 OCR Provider}
         E -->|Azure| E1[Azure Document Intelligence]
         E -->|Mistral| E2[Mistral Document AI]
-        D --> F[🤖 GPT-35-Turbo]
+        D --> F[🤖 GPT-4.1]
         E1 --> G[⚙️ Hybrid Processing Pipeline]
         E2 --> G
         F --> G
@@ -135,7 +135,7 @@ graph TB
 | **📁 Document Storage** | Azure Blob Storage | Secure, scalable document repository |
 | **🗄️ Metadata Database** | Azure Cosmos DB | Results, configurations, and analytics |
 | **🔍 OCR Engine** | Azure Document Intelligence or Mistral Document AI | Structured text and layout extraction |
-| **🧠 AI Reasoning** | Azure OpenAI (GPT-35-Turbo) | Contextual understanding and extraction |
+| **🧠 AI Reasoning** | Azure OpenAI (GPT-4.1) | Contextual understanding and extraction |
 | **🏗️ Container Registry** | Azure Container Registry | Container images (public by design — only public component, enables `azd` / CI image push) |
 | **🔒 Security** | Managed Identity + RBAC | Zero-credential architecture |
 | **🌐 Network** | VNet + Private Endpoints | Network isolation for all Azure services |
@@ -150,13 +150,13 @@ graph TB
 ARGUS implements a defense-in-depth security model:
 
 ### Network Isolation
-- **VNet Integration**: All Container Apps run within a dedicated Virtual Network (default `10.0.0.0/16`, carved into three subnets automatically)
-- **Single network parameter**: One `vnetAddressSpace` param drives the whole layout — the three subnets are derived inside `network.bicep` via `cidrSubnet()`, so they can never overlap or drift
-  - `/21` Container Apps subnet (delegated to `Microsoft.App/environments`, ~2,000 IPs)
-  - `/24` Private Endpoints subnet
-  - `/24` Application Gateway subnet (always created, only populated when `deployAppGateway = true`)
+- **VNet Integration**: All Container Apps run within a dedicated Virtual Network (default `10.0.0.0/24`, carved into three subnets automatically). The Container Apps environment runs on the **Workload Profiles** SKU so its infrastructure subnet can be a `/27` — a Consumption-only environment would require `/23` minimum and would not fit a `/24` VNet
+- **Single network parameter**: One `vnetAddressSpace` param drives the whole layout. The default lives in `main.bicep` and is passed into `network.bicep` (no duplicate default to drift). The three subnets are derived via `cidrSubnet()`, so they can never overlap
+  - `/27` Container Apps subnet (delegated to `Microsoft.App/environments`, 32 IPs — `.0/27`)
+  - `/27` Private Endpoints subnet (32 IPs — `.32/27`)
+  - `/26` Application Gateway subnet (64 IPs — `.64/26`, always created, only populated when `deployAppGateway = true`)
 - **Private Endpoints**: Storage, Cosmos DB, OpenAI, Document Intelligence, Key Vault, Log Analytics, and Application Insights are accessible only through private endpoints
-- **Private DNS Zones**: Automatic DNS resolution for private endpoints via Azure Private DNS, including a wildcard zone for the Container Apps environment's `defaultDomain`
+- **Private DNS Zones**: Automatic DNS resolution for private endpoints via Azure Private DNS, including a wildcard zone for the Container Apps environment's `defaultDomain` (defined in its own `aca-dns.bicep` sub-module — Bicep can't use the env's runtime `defaultDomain` as a resource name in the same file, but it can pass it as a module parameter)
 - **No Public Access**: All backend services have `publicNetworkAccess: Disabled`
 - **ACR exception**: Azure Container Registry is intentionally public — image pulls flow outbound from the Container Apps data plane, and image pushes from `azd` / CI need a reachable endpoint
 - **Optional WAF entry point**: Set `deployAppGateway = true` to bring an internet-facing Application Gateway (WAF_v2, OWASP 3.2, Prevention mode) in front of the internal frontend. Leave it `false` for a fully-private deployment reachable only via VPN, Bastion, or Front Door with a private origin
@@ -182,7 +182,14 @@ ARGUS implements a defense-in-depth security model:
 ## ⚡ Quick Start: Deploy in Minutes
 
 ### � Switch the Azure OpenAI model
-The default model is `gpt-35-turbo` for broad availability. To change it, update `azureOpenaiModelName` in `infra/main.bicep` or set `AZURE_OPENAI_MODEL_NAME` in `infra/main.parameters.json`. If you need a specific version, also set `azureOpenaiModelVersion`.
+The default model is `gpt-4.1` — the minimum recommended model for ARGUS extraction quality. To override it, either edit `azureOpenaiModelName` in `infra/main.bicep` or — the recommended path — set it on the azd environment:
+
+```bash
+azd env set AZURE_OPENAI_MODEL_NAME gpt-4.1-mini
+azd env set AZURE_OPENAI_MODEL_VERSION 2025-04-14   # optional
+```
+
+`infra/main.bicepparam` reads these via `readEnvironmentVariable()` and feeds them into the deployment on the next `azd up`.
 
 > Private deployment note: ARGUS is architected to keep OpenAI, monitoring, storage, and database traffic inside Azure using private endpoints and Private DNS zones. Monitoring telemetry flows through Application Insights with private endpoint access only.
 
@@ -405,7 +412,7 @@ ARGUS implements a **hardened, private-only infrastructure** on the `hardening/p
 #### 🛡️ Private-Only Architecture Features
 
 **Network Isolation**
-- ✅ **Virtual Network (VNet)**: All services deployed within an isolated VNet (`10.0.0.0/16` by default) with three derived subnets — Container Apps `/21`, Private Endpoints `/24`, Application Gateway `/24`
+- ✅ **Virtual Network (VNet)**: All services deployed within an isolated VNet (`10.0.0.0/24` by default — 256 addresses) with three derived subnets — Container Apps `/27`, Private Endpoints `/27`, Application Gateway `/26`. The Container Apps environment uses the Workload Profiles SKU so a `/27` infrastructure subnet is supported
 - ✅ **Private Endpoints**: Storage, Cosmos DB, OpenAI, Document Intelligence, Key Vault, Log Analytics, and Application Insights are accessible ONLY via private endpoints
 - ✅ **No Public Access**: All backing PaaS services have `publicNetworkAccess: Disabled`
 - ⚠️ **ACR is public by design**: Container Registry stays public so `azd` and CI runners can push images without a self-hosted agent or VPN. Image pulls flow outbound from the Container Apps data plane
@@ -455,14 +462,15 @@ infra/
 ├── main-containerapp.bicep             # Single-file Container App template
 ├── main-containerapp.parameters.json   # Container App parameters
 └── modules/
-    ├── network.bicep                   # VNet (single vnetAddressSpace param), 3 derived subnets, private DNS zones
+    ├── network.bicep                   # VNet (/24 default, single vnetAddressSpace param), 3 derived subnets (/27, /27, /26), private DNS zones
     ├── key-vault.bicep                 # Key Vault with private endpoint
     ├── storage.bicep                   # Storage Account with private endpoint
     ├── cosmos.bicep                    # Cosmos DB with private endpoint
     ├── ai-services.bicep               # Azure OpenAI with private endpoint
     ├── document-intelligence.bicep     # Document Intelligence with private endpoint
     ├── container-registry.bicep        # ACR (public by design — only public component)
-    ├── container-apps.bicep            # Backend & Frontend Container Apps (internal) + ACA Private DNS Zone
+    ├── container-apps.bicep            # Backend & Frontend Container Apps (internal) + CAE
+    ├── aca-dns.bicep                   # Private DNS zone for the ACA env's defaultDomain (sub-module of container-apps)
     ├── identity.bicep                  # Managed Identity
     ├── monitoring.bicep                # Application Insights & Log Analytics (AMPLS-private)
     ├── role-assignments.bicep          # RBAC role assignments
@@ -472,28 +480,38 @@ infra/
 
 #### 🔧 Deployment Parameters
 
-The infrastructure is parameterized but kept deliberately small — there is exactly one knob for the network and one knob for the optional WAF.
+The infrastructure is parameterized but kept deliberately small — there is exactly one knob for the network and one knob for the optional WAF. **All knobs flow through `infra/main.bicepparam`**, which reads values from the azd environment via `readEnvironmentVariable()`. There is no `main.parameters.json` — having both files present caused azd to silently prefer the JSON, which is why `deployAppGateway = true` was being ignored in earlier revisions.
 
 **Network configuration — one parameter** (`main.bicepparam`):
 
 ```bicep
-// VNet address space (default: 10.0.0.0/16)
+// VNet address space (default: 10.0.0.0/24 — 256 addresses).
 // The three subnets are derived automatically inside network.bicep via cidrSubnet():
-//   .0.0/21   → Container Apps environment (delegated, ~2,000 IPs)
-//   .8.0/24   → Private endpoints for PaaS services
-//   .9.0/24   → Application Gateway (only populated when deployAppGateway = true)
-param vnetAddressSpace = '10.0.0.0/16'
+//   .0/27   → Container Apps environment (Workload Profiles SKU, 32 IPs)
+//   .32/27  → Private endpoints for PaaS services (32 IPs)
+//   .64/26  → Application Gateway (64 IPs, only populated when deployAppGateway = true)
+param vnetAddressSpace = readEnvironmentVariable('AZURE_VNET_ADDRESS_SPACE', '10.0.0.0/24')
 ```
 
-> **Why a single parameter?** Earlier versions exposed three separate prefixes (`vnetAddressSpace`, `containerAppsSubnetAddressPrefix`, `privateEndpointsSubnetAddressPrefix`) that had to stay in sync manually. Now you set the parent CIDR once and the subnets are carved out automatically — no chance of overlap or drift.
+> **Why /24 instead of /16?** The full VNet only needs ~30 IPs per subnet to comfortably run ARGUS. A /16 (65k addresses) wastes RFC1918 space and makes peering into a landing zone harder. Switch to /23 or larger only if you plan to add dedicated workload profiles, more PE-backed services, or scale the App Gateway above 3 instances.
+>
+> **Why a single parameter?** Earlier revisions exposed three separate prefixes (`vnetAddressSpace`, `containerAppsSubnetAddressPrefix`, `privateEndpointsSubnetAddressPrefix`) that had to stay in sync manually. Now you set the parent CIDR once and the subnets are carved out automatically — no chance of overlap or drift.
 
 **Optional Application Gateway + WAF** (`main.bicepparam`):
 
 ```bicep
-// Set to true to deploy an internet-facing Application Gateway (WAF_v2, OWASP 3.2,
-// Prevention mode) in front of the internal frontend container app.
-// Leave false for a fully-private deployment reachable only via VPN/Bastion/Front Door.
-param deployAppGateway = false
+// Set DEPLOY_APP_GATEWAY=true in the azd env to bring up an internet-facing
+// Application Gateway (WAF_v2, OWASP 3.2, Prevention mode) in front of the
+// internal frontend container app. Leave unset (or 'false') for a fully-private
+// deployment reachable only via VPN/Bastion/Front Door.
+param deployAppGateway = toLower(readEnvironmentVariable('DEPLOY_APP_GATEWAY', 'false')) == 'true'
+```
+
+Enable it from the shell:
+
+```bash
+azd env set DEPLOY_APP_GATEWAY true
+azd up
 ```
 
 When `deployAppGateway = true`, the template provisions:
@@ -512,17 +530,17 @@ When `deployAppGateway = true`, the template provisions:
 
 **Example: Deploy to a different IP space**:
 
-```bicep
-// Override defaults for your organization's address plan.
-// Subnets are still derived automatically — no other params to change.
-param vnetAddressSpace = '192.168.0.0/16'
+```bash
+# Override the default /24 for your organization's address plan.
+# Subnets are still derived automatically — no other params to change.
+azd env set AZURE_VNET_ADDRESS_SPACE 192.168.10.0/24
 ```
 
 **Example: Public WAF in front of the frontend**:
 
-```bicep
-param vnetAddressSpace = '10.0.0.0/16'
-param deployAppGateway   = true
+```bash
+azd env set DEPLOY_APP_GATEWAY true
+azd up
 ```
 
 After `azd up`, retrieve the public URL:
@@ -711,12 +729,12 @@ ARGUS/
 │
 ├── 📂 infra/                            # 🏗️ Azure Infrastructure as Code
 │   ├── ⚙️ main.bicep                    # Orchestrator Bicep template (calls modules)
-│   ├── ⚙️ main.parameters.json          # Infrastructure parameters & configuration
+│   ├── ⚙️ main.bicepparam                # Single-source parameters (env-driven via readEnvironmentVariable)
 │   ├── ⚙️ main-containerapp.bicep       # Container App specific infrastructure
 │   ├── ⚙️ main-containerapp.parameters.json # Container App parameters
 │   ├── 📋 abbreviations.json            # Azure resource naming abbreviations
 │   └── 📂 modules/                      # Modular Bicep components
-│       ├── ⚙️ network.bicep             # VNet (single vnetAddressSpace), 3 derived subnets, private DNS zones
+│       ├── ⚙️ network.bicep             # VNet (/24 default, single vnetAddressSpace), 3 derived subnets (/27, /27, /26), private DNS zones
 │       ├── ⚙️ identity.bicep            # User-assigned managed identity
 │       ├── ⚙️ storage.bicep             # Storage account + private endpoint
 │       ├── ⚙️ cosmos.bicep              # Cosmos DB + private endpoint
@@ -724,7 +742,8 @@ ARGUS/
 │       ├── ⚙️ document-intelligence.bicep # Doc Intelligence + private endpoint
 │       ├── ⚙️ key-vault.bicep           # Key Vault + private endpoint
 │       ├── ⚙️ container-registry.bicep  # ACR (public by design — only public component)
-│       ├── ⚙️ container-apps.bicep      # CAE + backend/frontend container apps + ACA private DNS zone
+│       ├── ⚙️ container-apps.bicep      # CAE + backend/frontend container apps
+│       ├── ⚙️ aca-dns.bicep             # Private DNS zone for the ACA env's defaultDomain (sub-module)
 │       ├── ⚙️ role-assignments.bicep    # RBAC role assignments
 │       ├── ⚙️ monitoring.bicep          # Application Insights + Log Analytics (AMPLS-private)
 │       ├── ⚙️ event-processing.bicep    # Event Grid subscriptions
@@ -952,7 +971,7 @@ priority: "high"
 {
   "openai_settings": {
     "endpoint": "https://your-openai.openai.azure.com/",
-    "model": "gpt-35-turbo",
+    "model": "gpt-4.1",
     "temperature": 0.1,
     "max_tokens": 4000
   },

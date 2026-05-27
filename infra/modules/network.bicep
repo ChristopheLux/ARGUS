@@ -2,21 +2,46 @@
 // Private DNS zones for all PaaS services that use private endpoints.
 // ACR is intentionally public — no ACR DNS zone needed.
 //
-// Subnet layout is derived from a single vnetAddressSpace (default /16) using cidrSubnet():
-//   .0.0/21  → Container Apps environment (delegated, ~2,000 IPs)
-//   .8.0/24  → Private endpoints for PaaS services
-//   .9.0/24  → Application Gateway (always created; only used when deployAppGateway = true)
-// One parameter, three subnets — no chance of overlap or drift.
+// Subnet layout is derived from vnetAddressSpace using cidrSubnet() — sizes scale
+// with the VNet so a larger VNet gets larger subnets instead of wasting addresses.
+//
+//   Container Apps env: /27 minimum (ACA Workload Profiles floor), grows to roughly
+//                       half the VNet on /22+ inputs (vnetPrefix + 3, capped at /27).
+//   Private endpoints:  fixed /27 — 32 IPs handles every PE in this template.
+//   App Gateway:        fixed /26 — AGW v2 + WAF minimum, always created (only
+//                       attached when deployAppGateway = true).
+//
+// Default /24 (256 addresses) carves to .0/27, .32/27, .64/26 — unchanged from before.
+// A /22 (1024 addresses) carves to .0/25 (CA), .128/27 (PE), .192/26 (AGW).
+// A /20 (4096 addresses) carves to .0/23 (CA), .2.0/27 (PE), .2.64/26 (AGW).
+//
+// Note: Consumption-only ACA environments require /23 minimum for the infrastructure
+// subnet. main.bicep deploys the ACA env with Workload Profiles, so the floor is /27.
 param location string
 param resourceToken string
 param tags object
 
-@description('VNet address space in CIDR notation. The three subnets are derived from this.')
-param vnetAddressSpace string = '10.0.0.0/16'
+@description('VNet address space in CIDR notation. Subnets are derived from this — passed in from main.bicep as the single source of truth.')
+param vnetAddressSpace string
 
-var containerAppsSubnetPrefix = cidrSubnet(vnetAddressSpace, 21, 0)
-var privateEndpointsSubnetPrefix = cidrSubnet(vnetAddressSpace, 24, 8)
-var appGatewaySubnetPrefix = cidrSubnet(vnetAddressSpace, 24, 9)
+// Derive prefix lengths from the VNet size so a /22 or /20 input grows the CA subnet
+// instead of leaving address space stranded.
+var vnetPrefix = int(split(vnetAddressSpace, '/')[1])
+var caPrefix = min(vnetPrefix + 3, 27) // floor at /27 (ACA Workload Profiles minimum)
+var pePrefix = 27
+var agwPrefix = 26
+
+// Bicep has no pow() — enumerate 2^(27 - caPrefix) so we know how many /27 slots
+// the CA subnet consumes. Used to place PE and AGW right after it without overlap.
+var caSlotsOf27 = caPrefix == 27 ? 1 : caPrefix == 26 ? 2 : caPrefix == 25 ? 4 : caPrefix == 24 ? 8 : caPrefix == 23 ? 16 : caPrefix == 22 ? 32 : caPrefix == 21 ? 64 : caPrefix == 20 ? 128 : 256
+var peIndex = caSlotsOf27
+// AGW is /26 (= 2 /27 slots); align it to the next /26 boundary past PE.
+// ceil((caSlotsOf27 + 1) / 2) using integer math.
+var agwIndex = (caSlotsOf27 + 2) / 2
+
+var containerAppsSubnetPrefix = cidrSubnet(vnetAddressSpace, caPrefix, 0)
+var privateEndpointsSubnetPrefix = cidrSubnet(vnetAddressSpace, pePrefix, peIndex)
+var appGatewaySubnetPrefix = cidrSubnet(vnetAddressSpace, agwPrefix, agwIndex)
 
 resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
   name: 'vnet-${resourceToken}'
